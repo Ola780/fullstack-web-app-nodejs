@@ -1,0 +1,13 @@
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Backend
+.env
+.env.local
+
+# IDE / system
+.idea/
+.vscode/
+.DS_Store
