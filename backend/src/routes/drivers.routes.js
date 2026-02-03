@@ -42,14 +42,14 @@ driversRouter.get("/:id", authRequired, async (req, res, next) => {
     } catch (e) { next(e); }
 });
 
-driversRouter.post("/", authRequired, requireRoles("ADMIN", "MANAGER"), validateBody(driverCreateSchema), async (req, res, next) => {
+driversRouter.post("/", authRequired, requireRoles("MANAGER"), validateBody(driverCreateSchema), async (req, res, next) => {
     try {
         const id = await createDriver(req.user.userId,req.body);
         res.status(201).json({ id });
     } catch (e) { next(e); }
 });
 
-driversRouter.put("/:id", authRequired, requireRoles("ADMIN","MANAGER"), validateBody(driverUpdateSchema), async (req, res, next) => {
+driversRouter.put("/:id", authRequired, requireRoles("MANAGER"), validateBody(driverUpdateSchema), async (req, res, next) => {
     try {
         await updateDriverAsUser({
             userId: req.user.userId,

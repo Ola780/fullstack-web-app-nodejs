@@ -2,13 +2,12 @@ import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { paginationQuerySchema } from "../validators/common.validators.js";
-import { enrollmentCreateSchema, enrollmentUpdateSchema } from "../validators/enrollment.validators.js";
+import { enrollmentCreateSchema } from "../validators/enrollment.validators.js";
 import {
     listEnrollmentsForUser,
     getEnrollmentDetailsForUser,
     createEnrollmentAsUser,
-    updateEnrollmentFinishPositionAsUser,
-    deleteEnrollmentAsUser
+    deleteEnrollmentAsUser,
 } from "../services/enrollments.service.js";
 
 export const enrollmentsRouter = Router();
@@ -33,16 +32,7 @@ enrollmentsRouter.post("/", authRequired, validateBody(enrollmentCreateSchema), 
     } catch (e) { next(e); }
 });
 
-enrollmentsRouter.put("/:id", authRequired, validateBody(enrollmentUpdateSchema), async (req, res, next) => {
-    try {
-        await updateEnrollmentFinishPositionAsUser({
-            userId: req.user.userId,
-            enrollmentId: Number(req.params.id),
-            dto: req.body
-        });
-        res.json({ ok: true });
-    } catch (e) { next(e); }
-});
+
 
 enrollmentsRouter.delete("/:id", authRequired, async (req, res, next) => {
     try {

@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { http } from "../api/http";
-import { Link, useLocation } from "react-router-dom";
 import Pagination from "../components/Pagination";
 import { useAuth } from "../auth/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -9,64 +8,66 @@ import { useTranslation } from "react-i18next";
 export default function DriversList() {
     const { t } = useTranslation();
     const { role } = useAuth();
-    const location = useLocation();
+    const canCreateOrEdit = role === "MANAGER";
+    const canDelete = role === "MANAGER" || role === "ADMIN";
 
-    const [data, setData] = useState({ items: [], page: 1, pageSize: 10, total: 0 });
-    const [err, setErr] = useState("");
-
-    const canManageDrivers = role === "ADMIN" || role === "MANAGER";
+    const [data, setData] = useState({
+        items: [],
+        page: 1,
+        pageSize: 10,
+        total: 0,
+    });
+    const [error, setError] = useState("");
 
     const load = async (page) => {
-        setErr("");
+        setError("");
         try {
-            const r = await http.get("/drivers", { params: { page, pageSize: data.pageSize } });
-            setData(r.data);
-        } catch (e) {
-            setErr(e?.response?.data?.message || "Nie udało się pobrać listy kierowców.");
-        }
-    };
-
-    const onDelete = async (id) => {
-        const ok = window.confirm(`Na pewno usunąć kierowcę #${id}?`);
-        if (!ok) return;
-
-        try {
-            await http.delete(`/drivers/${id}`);
-            await load(data.page);
-        } catch (e) {
-            const msg =
-                e?.response?.data?.message ||
-                "Nie udało się usunąć kierowcę (może ma enrollmenty).";
-            alert(msg);
+            const res = await http.get("/drivers", {
+                params: { page, pageSize: data.pageSize },
+            });
+            setData(res.data);
+        } catch {
+            setError(t("drivers.list.loadError"));
         }
     };
 
     useEffect(() => {
-        load(data.page || 1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [location.key]);
+        load(1);
+    }, []);
+
+    const onDelete = async (id) => {
+        if (!window.confirm(t("drivers.delete.confirm", { id }))) return;
+
+        try {
+            await http.delete(`/drivers/${id}`);
+            load(data.page);
+        } catch {
+            alert(t("drivers.delete.failed"));
+        }
+    };
 
     return (
         <div>
+            <div className="hero" style={{ backgroundImage: "url(/images/drivers.jpg)" }} />
             <h2>{t("nav.drivers")}</h2>
 
-            {canManageDrivers && (
+            {canCreateOrEdit && (
                 <div style={{ marginBottom: 10 }}>
                     <Link to="/drivers/new">{t("common.create")}</Link>
                 </div>
             )}
 
-            {err && <div style={{ color: "crimson", marginBottom: 10 }}>{err}</div>}
+            {error && <div style={{ color: "crimson", marginBottom: 10 }}>{error}</div>}
 
             <table border="1" cellPadding="6">
                 <thead>
                 <tr>
-                    <th>id</th>
-                    <th>name</th>
-                    <th>dateOfBirth</th>
-                    <th>team</th>
+                    <th>{t("common.id")}</th>
+                    <th>{t("drivers.fields.name")}</th>
+                    <th>{t("drivers.fields.dateOfBirth")}</th>
+                    <th>{t("drivers.fields.team")}</th>
                     <th>{t("common.details")}</th>
-                    {canManageDrivers && <th>{t("common.actions") ?? "actions"}</th>}
+                    {canDelete && <th>{t("common.actions")}</th>}
                 </tr>
                 </thead>
 
@@ -84,12 +85,14 @@ export default function DriversList() {
                             <Link to={`/drivers/${d.id}`}>{t("common.details")}</Link>
                         </td>
 
-                        {canManageDrivers && (
+                        {canDelete && (
                             <td>
-                                <Link to={`/drivers/${d.id}/edit`}>{t("common.edit") ?? "Edit"}</Link>{" "}
-                                <button type="button" onClick={() => onDelete(d.id)}>
-                                    {t("common.delete")}
-                                </button>
+                                {canCreateOrEdit && (
+                                    <>
+                                        <Link to={`/drivers/${d.id}/edit`}>{t("common.edit")}</Link>{" "}
+                                    </>
+                                )}
+                                <button onClick={() => onDelete(d.id)}>{t("common.delete")}</button>
                             </td>
                         )}
                     </tr>
@@ -97,13 +100,7 @@ export default function DriversList() {
                 </tbody>
             </table>
 
-            <Pagination
-                page={data.page}
-                pageSize={data.pageSize}
-                total={data.total}
-                onPage={(p) => load(p)}
-            />
+            <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPage={load} />
         </div>
     );
 }
-

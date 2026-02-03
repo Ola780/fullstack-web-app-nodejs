@@ -1,14 +1,14 @@
 import jwt from "jsonwebtoken";
-import { db, sql } from "../db.js";
+import { db } from "../db.js";
 import { config } from "../config.js";
 
 export async function registerDriver({ name, surname, email, password, preferredLanguage }) {
     const pool = await db();
 
-    const roleRes = await pool.request().query(
-        `SELECT  id FROM [Role] WHERE name = 'DRIVER'`
+    const [roleRows] = await pool.query(
+        "SELECT id FROM role WHERE name = 'DRIVER' LIMIT 1"
     );
-    const roleId = roleRes.recordset[0]?.id;
+    const roleId = roleRows[0]?.id;
 
     if (!roleId) {
         const err = new Error("Role DRIVER not found.");
@@ -17,21 +17,14 @@ export async function registerDriver({ name, surname, email, password, preferred
     }
 
     try {
-        const insert = await pool.request()
-            .input("name", sql.NVarChar(20), name)
-            .input("surname", sql.NVarChar(20), surname)
-            .input("email", sql.NVarChar(40), email)
-            .input("password", sql.NVarChar(200), password)
-            .input("preferredLanguage", sql.Char(2), preferredLanguage)
-            .input("role", sql.Int, roleId)
-            .query(`
-        INSERT INTO [User] (name, surname, email, [password], preferredLanguage, [role], driver)
-        OUTPUT INSERTED.id
-        VALUES (@name, @surname, @email, @password, @preferredLanguage, @role, NULL)
-      `);
+        const [result] = await pool.query(
+            `INSERT INTO users (name, surname, email, password, preferredLanguage, role, driver)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+            [name, surname, email, password, preferredLanguage, roleId]
+        );
 
-        return insert.recordset[0].id;
-    } catch (e) {
+        return result.insertId;
+    } catch {
         const err = new Error("Registration failed (email may already exist).");
         err.status = 400;
         throw err;
@@ -41,16 +34,16 @@ export async function registerDriver({ name, surname, email, password, preferred
 export async function login({ email, password }) {
     const pool = await db();
 
-    const res = await pool.request()
-        .input("email", sql.NVarChar(40), email)
-        .query(`
-      SELECT u.id, u.[password], r.name AS roleName
-      FROM [User] u
-      JOIN [Role] r ON r.id = u.[role]
-      WHERE u.email = @email
-    `);
+    const [rows] = await pool.query(
+        `SELECT u.id, u.password, r.name AS roleName
+     FROM users u
+     JOIN role r ON r.id = u.role
+     WHERE u.email = ?
+     LIMIT 1`,
+        [email]
+    );
 
-    const user = res.recordset[0];
+    const user = rows[0];
 
     if (!user || password !== user.password) {
         const err = new Error("Invalid credentials");

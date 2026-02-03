@@ -1,41 +1,65 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 export default function Login() {
     const { t } = useTranslation();
     const { login } = useAuth();
-    const nav = useNavigate();
+    const navigate = useNavigate();
+
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [err, setErr] = useState("");
+    const [error, setError] = useState("");
 
     const onSubmit = async (e) => {
         e.preventDefault();
-        setErr("");
-        if (!email.includes("@")) return setErr("Invalid email");
-        if (!password) return setErr("Password required");
+        setError("");
+
+        if (!email.includes("@")) {
+            return setError(t("auth.validation.invalidEmail"));
+        }
+        if (!password) {
+            return setError(t("auth.validation.passwordRequired"));
+        }
+
         try {
             await login(email, password);
-            nav("/");
+            navigate("/");
         } catch {
-            setErr("Login failed");
+            setError(t("auth.loginFailed"));
         }
     };
 
     return (
         <div style={{ maxWidth: 360 }}>
+            <div
+                className="hero"
+                style={{
+                    backgroundImage: "url(/images/flags.jpg)",
+                }}
+            />
+
             <h2>{t("auth.login")}</h2>
+
             <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <input placeholder={t("auth.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
-                <input placeholder={t("auth.password")} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-                {err && <div style={{ color: "crimson" }}>{err}</div>}
+                <input
+                    placeholder={t("auth.email")}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                />
+
+                <input
+                    type="password"
+                    placeholder={t("auth.password")}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
+
+                {error && <div style={{ color: "crimson" }}>{error}</div>}
+
                 <button type="submit">{t("auth.login")}</button>
             </form>
-            <div style={{ marginTop: 10 }}>
-                <Link to="/register">{t("auth.register")}</Link>
-            </div>
         </div>
     );
 }

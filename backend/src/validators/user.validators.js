@@ -9,3 +9,10 @@ export const userCreateSchema = z.object({
     roleName: z.enum(["DRIVER", "MANAGER"]),
     driver: z.number().int().positive().nullable().optional(),
 });
+
+export const userEditCrudSchema = z.object({
+    roleName: z.enum(["DRIVER", "MANAGER"]),
+    driverId: z.number().int().positive().nullable(),
+    teamId: z.number().int().positive().nullable(),
+});
+

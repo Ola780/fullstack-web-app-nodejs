@@ -3,8 +3,10 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/rbac.js";
 import { validateBody } from "../middleware/validate.js";
 import { paginationQuerySchema } from "../validators/common.validators.js";
-import { userCreateSchema } from "../validators/user.validators.js";
-import { listUsers, deleteUser, createUser } from "../services/users.service.js";
+import { userCreateSchema, userEditCrudSchema } from "../validators/user.validators.js";
+
+import { listUsers, deleteUser, createUser,getUserByIdForAdmin,
+    updateUserAsAdmin } from "../services/users.service.js";
 
 export const usersRouter = Router();
 
@@ -14,6 +16,26 @@ usersRouter.get("/", authRequired, requireRoles("ADMIN"), async (req, res, next)
         res.json(await listUsers(q));
     } catch (e) { next(e); }
 });
+
+usersRouter.get("/:id", authRequired, requireRoles("ADMIN"), async (req, res, next) => {
+    try {
+        res.json(await getUserByIdForAdmin(Number(req.params.id)));
+    } catch (e) { next(e); }
+});
+
+usersRouter.put(
+    "/:id",
+    authRequired,
+    requireRoles("ADMIN"),
+    validateBody(userEditCrudSchema),
+    async (req, res, next) => {
+        try {
+            await updateUserAsAdmin(Number(req.params.id), req.body);
+            res.json({ ok: true });
+        } catch (e) { next(e); }
+    }
+);
+
 
 usersRouter.post("/", authRequired, requireRoles("ADMIN"), validateBody(userCreateSchema), async (req, res, next) => {
     try {

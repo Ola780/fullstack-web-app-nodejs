@@ -2,9 +2,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 console.log("CONFIG DB =", {
-    server: process.env.DB_SERVER,
+    host: process.env.DB_HOST,
     port: process.env.DB_PORT,
-    database: process.env.DB_DATABASE,
+    database: process.env.DB_NAME,
 });
 
 export const config = {
@@ -13,12 +13,12 @@ export const config = {
     corsOrigin: process.env.CORS_ORIGIN,
 
     db: {
-        server: process.env.DB_SERVER,
-        port: Number(process.env.DB_PORT),
-        database: process.env.DB_DATABASE,
+        host: process.env.DB_HOST,
+        port: Number(process.env.DB_PORT || 3306),
+        database: process.env.DB_NAME,
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
-        encrypt: process.env.DB_ENCRYPT === "true",
+        ssl: process.env.DB_SSL === "true",
     },
 
     jwt: {
@@ -26,6 +26,3 @@ export const config = {
         expires: process.env.JWT_EXPIRES,
     },
 };
-
-
-

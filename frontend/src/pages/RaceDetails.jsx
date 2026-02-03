@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { http } from "../api/http";
-import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useTranslation } from "react-i18next";
 
@@ -8,39 +8,73 @@ export default function RaceDetails() {
     const { t } = useTranslation();
     const { id } = useParams();
     const { role } = useAuth();
-    const [data, setData] = useState(null);
+
+    const [race, setRace] = useState(null);
+    const [enrollments, setEnrollments] = useState([]);
+    const [error, setError] = useState("");
 
     useEffect(() => {
-        http.get(`/races/${id}`).then(r => setData(r.data));
-    }, [id]);
+        setError("");
+        http
+            .get(`/races/${id}`)
+            .then((r) => {
+                setRace(r.data.race);
+                setEnrollments(r.data.enrollments || []);
+            })
+            .catch(() => setError(t("races.details.loadError")));
+    }, [id, t]);
 
-    if (!data) return <div>Loading...</div>;
+    if (error) return <div style={{ color: "crimson" }}>{error}</div>;
+    if (!race) return <div>{t("common.loading")}</div>;
 
     return (
         <div>
-            <h2>Race #{data.race.id}: {data.race.name}</h2>
-            <div>startDate: {String(data.race.startDate).slice(0,10)}</div>
-            <div>status: {data.race.status}</div>
+            <div
+                className="hero"
+                style={{
+                    backgroundImage: "url(/images/races.jpg)",
+                }}
+            />
 
-            {role === "ADMIN" && (
-                <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
-                    <Link to={`/races/${data.race.id}/edit`}>{t("common.edit")}</Link>
-                </div>
-            )}
+            <h2>
+                {t("races.details.title", { id: race.id })}: {race.name}
+            </h2>
 
-            <h3 style={{ marginTop: 16 }}>Enrollments</h3>
+            <div>
+                {t("races.fields.startDate")}: {String(race.startDate).slice(0, 10)}
+            </div>
+
+            <div>
+                {t("races.fields.status")}: {race.status}
+            </div>
+
+            {role === "ADMIN" && <div style={{ marginTop: 10 }}></div>}
+
+            <h3 style={{ marginTop: 16 }}>{t("races.enrollments.title")}</h3>
+
             <table border="1" cellPadding="6">
                 <thead>
-                <tr><th>id</th><th>driver</th><th>team</th><th>finishPosition</th><th>enrollmentDate</th></tr>
+                <tr>
+                    <th>{t("common.id")}</th>
+                    <th>{t("enrollments.fields.driver")}</th>
+                    <th>{t("enrollments.fields.team")}</th>
+                    <th>{t("enrollments.fields.finishPosition")}</th>
+                    <th>{t("enrollments.fields.enrollmentDate")}</th>
+                </tr>
                 </thead>
+
                 <tbody>
-                {data.enrollments.map(e => (
+                {enrollments.map((e) => (
                     <tr key={e.id}>
                         <td>{e.id}</td>
-                        <td>{e.driverName} (#{e.driverId})</td>
-                        <td>{e.teamName} (#{e.teamId})</td>
+                        <td>
+                            {e.driverName} (#{e.driverId})
+                        </td>
+                        <td>
+                            {e.teamName} (#{e.teamId})
+                        </td>
                         <td>{e.finishPosition ?? "-"}</td>
-                        <td>{String(e.enrollmentDate).slice(0,10)}</td>
+                        <td>{String(e.enrollmentDate).slice(0, 10)}</td>
                     </tr>
                 ))}
                 </tbody>

@@ -9,17 +9,24 @@ export default function NavBar() {
     const { isLoggedIn, role, logout } = useAuth();
 
     return (
-        <div style={{ display: "flex", gap: 12, padding: 12, borderBottom: "1px solid #ddd", alignItems: "center" }}>
-            <Link to="/">{t("nav.dashboard")}</Link>
-            <Link to="/races">{t("nav.races")}</Link>
+        <div className="navbar">
+            <div className="navlinks">
+                <Link to="/">{t("nav.dashboard")}</Link>
+                <Link to="/races">{t("nav.races")}</Link>
+                {isLoggedIn && <Link to="/drivers">{t("nav.drivers")}</Link>}
+                {isLoggedIn && <Link to="/enrollments">{t("nav.enrollments")}</Link>}
+                {role === "ADMIN" && <Link to="/admin/users">{t("nav.users")}</Link>}
+                {role === "ADMIN" && <Link to="/teams">{t("nav.teams")}</Link>}
 
-            {isLoggedIn && <Link to="/drivers">{t("nav.drivers")}</Link>}
-            {isLoggedIn && <Link to="/enrollments">{t("nav.enrollments")}</Link>}
-            {role === "ADMIN" && <Link to="/admin/users">{t("nav.users")}</Link>}
+            </div>
 
-            <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+            <div className="nav-right">
                 <LanguageSwitcher />
-                {isLoggedIn ? <button onClick={logout}>{t("common.logout")}</button> : <Link to="/login">{t("auth.login")}</Link>}
+                {isLoggedIn ? (
+                    <button onClick={logout}>{t("common.logout")}</button>
+                ) : (
+                    <Link to="/login">{t("auth.login")}</Link>
+                )}
             </div>
         </div>
     );

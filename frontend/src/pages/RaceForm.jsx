@@ -1,131 +1,69 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { http } from "../api/http";
 import { useTranslation } from "react-i18next";
 
-function isIsoDate(value) {
-    return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
+const isIsoDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 export default function RaceForm() {
     const { t } = useTranslation();
+
     const navigate = useNavigate();
-    const params = useParams();
+    const { id } = useParams();
 
-    const isEdit = Boolean(params.id);
-    const raceId = isEdit ? Number(params.id) : null;
+    const isEdit = !!id;
 
+    const [form, setForm] = useState({ name: "", startDate: "", status: "Planned" });
     const [loading, setLoading] = useState(isEdit);
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState("");
 
-    const [serverError, setServerError] = useState("");
-    const [errors, setErrors] = useState({});
-
-    const [form, setForm] = useState({
-        name: "",
-        startDate: "",
-        status: "Planned",
-    });
-
-    // --- load data for edit ---
     useEffect(() => {
         if (!isEdit) return;
 
-        let mounted = true;
-
-        async function loadRace() {
+        (async () => {
+            setError("");
             setLoading(true);
-            setServerError("");
-
             try {
-                const res = await http.get(`/races/${raceId}`);
-
-                // Dostosowanie do możliwych formatów:
-                // 1) RaceDetails może zwracać { race, enrollments }
-                // 2) albo sam obiekt race
+                const res = await http.get(`/races/${id}`);
                 const r = res.data?.race ?? res.data;
 
-                if (!r) throw new Error("No race in response");
-
-                const startDate = r.startDate ? String(r.startDate).slice(0, 10) : "";
-
-                if (mounted) {
-                    setForm({
-                        name: r.name ?? "",
-                        startDate,
-                        status: r.status ?? "Planned",
-                    });
-                }
-            } catch (e) {
-                if (mounted) setServerError("Nie udało się pobrać danych wyścigu do edycji.");
+                setForm({
+                    name: r?.name ?? "",
+                    startDate: typeof r?.startDate === "string" ? r.startDate.slice(0, 10) : "",
+                    status: r?.status ?? "Planned",
+                });
+            } catch {
+                setError(t("races.form.loadError"));
             } finally {
-                if (mounted) setLoading(false);
+                setLoading(false);
             }
-        }
+        })();
+    }, [isEdit, id, t]);
 
-        loadRace();
-        return () => { mounted = false; };
-    }, [isEdit, raceId]);
-
-    const validate = () => {
-        const next = {};
-
-        const name = form.name.trim();
-        if (!name) next.name = "Nazwa wyścigu jest wymagana.";
-        else if (name.length > 30) next.name = "Maksymalnie 30 znaków.";
-
-        if (!isIsoDate(form.startDate)) {
-            next.startDate = "Data startu musi być w formacie RRRR-MM-DD.";
-        }
-
-        // Statusy – dopasuj do tego, co masz w bazie
-        const allowed = ["Planned", "Ongoing", "Finished", "Cancelled"];
-        if (!allowed.includes(form.status)) {
-            next.status = "Nieprawidłowy status.";
-        }
-
-        setErrors(next);
-        return Object.keys(next).length === 0;
-    };
-
-    const canSubmit = useMemo(() => {
-        return !loading && !submitting;
-    }, [loading, submitting]);
-
-    const onChange = (e) => {
-        const { name, value } = e.target;
-        setForm((p) => ({ ...p, [name]: value }));
-    };
+    const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
     const onSubmit = async (e) => {
         e.preventDefault();
-        setServerError("");
+        setError("");
 
-        if (!validate()) return;
+        const name = form.name.trim();
+        if (!name) return setError(t("races.form.validation.nameRequired"));
+        if (!isIsoDate(form.startDate)) return setError(t("races.form.validation.startDateFormat"));
+
+        const payload = { name, startDate: form.startDate, status: form.status };
 
         setSubmitting(true);
         try {
-            const payload = {
-                name: form.name.trim(),
-                startDate: form.startDate,
-                status: form.status,
-            };
-
             if (isEdit) {
-                await http.put(`/races/${raceId}`, payload);
-                navigate(`/races/${raceId}`);
+                await http.put(`/races/${id}`, payload);
+                navigate(`/races/${id}`);
             } else {
                 const res = await http.post("/races", payload);
-                // jeśli backend zwraca {id}, to przejdź do szczegółów; jak nie, to do listy
-                const newId = res.data?.id;
-                if (newId) navigate(`/races/${newId}`);
-                else navigate("/races");
+                navigate(res.data?.id ? `/races/${res.data.id}` : "/races");
             }
         } catch (err) {
-            const msg =
-                err?.response?.data?.message ||
-                "Nie udało się zapisać wyścigu. Sprawdź dane i spróbuj ponownie.";
-            setServerError(msg);
+            setError(err?.response?.data?.message || t("races.form.saveError"));
         } finally {
             setSubmitting(false);
         }
@@ -134,38 +72,33 @@ export default function RaceForm() {
     if (loading) {
         return (
             <div style={{ padding: 16 }}>
-                <h2>{isEdit ? "Edytuj wyścig" : "Dodaj wyścig"}</h2>
-                <p>Ładowanie...</p>
-                {serverError && <p style={{ color: "crimson" }}>{serverError}</p>}
+                <h2>{isEdit ? t("races.form.editTitle") : t("races.form.createTitle")}</h2>
+                <p>{t("common.loading")}</p>
+                {error && <p style={{ color: "crimson" }}>{error}</p>}
             </div>
         );
     }
 
     return (
         <div style={{ padding: 16, maxWidth: 520 }}>
-            <h2>{isEdit ? "Edytuj wyścig" : "Dodaj wyścig"}</h2>
+            <div className="hero" style={{ backgroundImage: "url(/images/races.jpg)" }} />
 
-            {serverError && (
-                <div style={{ marginBottom: 12, color: "crimson" }}>
-                    {serverError}
-                </div>
-            )}
+            <h2>{isEdit ? t("races.form.editTitle") : t("races.form.createTitle")}</h2>
+            {error && <div style={{ color: "crimson", marginBottom: 12 }}>{error}</div>}
 
             <form onSubmit={onSubmit}>
                 <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Nazwa</label>
+                    <label style={{ display: "block", marginBottom: 4 }}>{t("races.fields.name")}</label>
                     <input
                         name="name"
                         value={form.name}
                         onChange={onChange}
-                        placeholder="np. Grand Prix Warsaw"
                         style={{ width: "100%", padding: 8 }}
                     />
-                    {errors.name && <div style={{ color: "crimson", marginTop: 4 }}>{errors.name}</div>}
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Data startu</label>
+                    <label style={{ display: "block", marginBottom: 4 }}>{t("races.fields.startDate")}</label>
                     <input
                         name="startDate"
                         value={form.startDate}
@@ -173,35 +106,29 @@ export default function RaceForm() {
                         placeholder="YYYY-MM-DD"
                         style={{ width: "100%", padding: 8 }}
                     />
-                    {errors.startDate && (
-                        <div style={{ color: "crimson", marginTop: 4 }}>{errors.startDate}</div>
-                    )}
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Status</label>
+                    <label style={{ display: "block", marginBottom: 4 }}>{t("races.fields.status")}</label>
                     <select
                         name="status"
                         value={form.status}
                         onChange={onChange}
                         style={{ width: "100%", padding: 8 }}
                     >
-                        <option value="Planned">Planned</option>
-                        <option value="Ongoing">Ongoing</option>
-                        <option value="Finished">Finished</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Planned">{t("races.status.Planned")}</option>
+                        <option value="Ongoing">{t("races.status.Ongoing")}</option>
+                        <option value="Finished">{t("races.status.Finished")}</option>
+                        <option value="Cancelled">{t("races.status.Cancelled")}</option>
                     </select>
-                    {errors.status && (
-                        <div style={{ color: "crimson", marginTop: 4 }}>{errors.status}</div>
-                    )}
                 </div>
 
                 <div style={{ display: "flex", gap: 8 }}>
-                    <button type="submit" disabled={!canSubmit} style={{ padding: "8px 12px" }}>
-                        {submitting ? "Zapisywanie..." : "Zapisz"}
+                    <button type="submit" disabled={submitting} style={{ padding: "8px 12px" }}>
+                        {submitting ? t("common.saving") : t("common.save")}
                     </button>
                     <button type="button" onClick={() => navigate("/races")} style={{ padding: "8px 12px" }}>
-                        Anuluj
+                        {t("common.cancel")}
                     </button>
                 </div>
             </form>

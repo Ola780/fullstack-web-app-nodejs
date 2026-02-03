@@ -1,24 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { http } from "../api/http";
-
-function isEmail(v) {
-    return /^\S+@\S+\.\S+$/.test(v);
-}
-
-function isLang(v) {
-    return /^[a-z]{2}$/i.test(v);
-}
+import { useTranslation } from "react-i18next";
 
 export default function UserForm() {
+    const { t } = useTranslation();
     const navigate = useNavigate();
 
     const [drivers, setDrivers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-
-    const [serverError, setServerError] = useState("");
-    const [errors, setErrors] = useState({});
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
 
     const [form, setForm] = useState({
         name: "",
@@ -31,162 +23,106 @@ export default function UserForm() {
     });
 
     useEffect(() => {
-        let mounted = true;
-
-        async function loadDrivers() {
-            setLoading(true);
-            setServerError("");
+        (async () => {
             try {
-                const r = await http.get("/drivers/available");
-                const items = Array.isArray(r.data) ? r.data : [];
-                if (mounted) setDrivers(items);
-            } catch (e) {
-                // driverzy są opcjonalni – ale dla DRIVER przydają się
-                if (mounted) setServerError("Nie udało się pobrać listy kierowców (Driver).");
+                const res = await http.get("/drivers/available");
+                setDrivers(Array.isArray(res.data) ? res.data : []);
+            } catch {
             } finally {
-                if (mounted) setLoading(false);
+                setLoading(false);
             }
-        }
-
-        loadDrivers();
-        return () => { mounted = false; };
+        })();
     }, []);
 
-    const validate = () => {
-        const next = {};
-
-        if (!form.name.trim()) next.name = "Name is required.";
-        if (!form.surname.trim()) next.surname = "Surname is required.";
-
-        if (!form.email.trim()) next.email = "Email is required.";
-        else if (!isEmail(form.email.trim())) next.email = "Invalid email.";
-
-        if (!form.password) next.password = "Password is required.";
-        else if (form.password.length < 4) next.password = "Min. 4 characters.";
-
-        if (!isLang(form.preferredLanguage)) next.preferredLanguage = "Use 2-letter code (pl/en).";
-
-        if (!["DRIVER", "MANAGER"].includes(form.roleName)) next.roleName = "Invalid role.";
-
-        if (form.roleName === "DRIVER") {
-            // driver FK opcjonalny, ale zalecany, bo kierowca ma widzieć swoje dane
-            // jeśli chcesz wymusić – odkomentuj:
-            // if (!form.driver) next.driver = "Select driver for DRIVER role.";
-        }
-
-        setErrors(next);
-        return Object.keys(next).length === 0;
-    };
-
-    const canSubmit = useMemo(() => !loading && !submitting, [loading, submitting]);
-
     const onChange = (e) => {
-        const { name, value } = e.target;
-        setForm((p) => ({ ...p, [name]: value }));
+        setForm({ ...form, [e.target.name]: e.target.value });
     };
 
     const onSubmit = async (e) => {
         e.preventDefault();
-        setServerError("");
+        setError("");
 
-        if (!validate()) return;
+        if (!form.name.trim() || !form.surname.trim()) return setError(t("users.form.validation.nameSurnameRequired"));
+        if (!form.email.includes("@")) return setError(t("auth.validation.invalidEmail"));
+        if (form.password.length < 4) return setError(t("users.form.validation.passwordMin4"));
 
-        setSubmitting(true);
+        const payload = {
+            name: form.name.trim(),
+            surname: form.surname.trim(),
+            email: form.email.trim(),
+            password: form.password,
+            preferredLanguage: form.preferredLanguage,
+            roleName: form.roleName,
+            driver: form.roleName === "DRIVER" && form.driver ? Number(form.driver) : null,
+        };
+
+        setSaving(true);
         try {
-            const payload = {
-                name: form.name.trim(),
-                surname: form.surname.trim(),
-                email: form.email.trim(),
-                password: form.password,
-                preferredLanguage: form.preferredLanguage.toLowerCase(),
-                roleName: form.roleName,
-                driver: form.roleName === "DRIVER" && form.driver ? Number(form.driver) : null,
-            };
-
             await http.post("/users", payload);
             navigate("/admin/users");
         } catch (err) {
-            const msg =
-                err?.response?.data?.message ||
-                "Nie udało się utworzyć użytkownika (email może już istnieć).";
-            setServerError(msg);
+            setError(err?.response?.data?.message || t("users.form.createFailed"));
         } finally {
-            setSubmitting(false);
+            setSaving(false);
         }
     };
 
+    if (loading) return <div style={{ padding: 16 }}>{t("common.loading")}</div>;
+
     return (
         <div style={{ padding: 16, maxWidth: 560 }}>
-            <h2>Create user</h2>
+            <h2>{t("users.form.createTitle")}</h2>
 
-            {serverError && <div style={{ marginBottom: 12, color: "crimson" }}>{serverError}</div>}
+            {error && <div style={{ color: "crimson", marginBottom: 12 }}>{error}</div>}
 
-            <form onSubmit={onSubmit}>
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Name</label>
-                    <input name="name" value={form.name} onChange={onChange} style={{ width: "100%", padding: 8 }} />
-                    {errors.name && <div style={{ color: "crimson" }}>{errors.name}</div>}
-                </div>
+            <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <input name="name" placeholder={t("auth.name")} value={form.name} onChange={onChange} />
+                <input name="surname" placeholder={t("auth.surname")} value={form.surname} onChange={onChange} />
+                <input name="email" placeholder={t("auth.email")} value={form.email} onChange={onChange} />
+                <input
+                    name="password"
+                    type="password"
+                    placeholder={t("auth.password")}
+                    value={form.password}
+                    onChange={onChange}
+                />
 
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Surname</label>
-                    <input name="surname" value={form.surname} onChange={onChange} style={{ width: "100%", padding: 8 }} />
-                    {errors.surname && <div style={{ color: "crimson" }}>{errors.surname}</div>}
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Email</label>
-                    <input name="email" value={form.email} onChange={onChange} style={{ width: "100%", padding: 8 }} />
-                    {errors.email && <div style={{ color: "crimson" }}>{errors.email}</div>}
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Password</label>
-                    <input type="password" name="password" value={form.password} onChange={onChange} style={{ width: "100%", padding: 8 }} />
-                    {errors.password && <div style={{ color: "crimson" }}>{errors.password}</div>}
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Preferred language</label>
-                    <select name="preferredLanguage" value={form.preferredLanguage} onChange={onChange} style={{ width: "100%", padding: 8 }}>
+                <label>
+                    {t("auth.lang")}{" "}
+                    <select name="preferredLanguage" value={form.preferredLanguage} onChange={onChange}>
                         <option value="pl">pl</option>
                         <option value="en">en</option>
                     </select>
-                    {errors.preferredLanguage && <div style={{ color: "crimson" }}>{errors.preferredLanguage}</div>}
-                </div>
+                </label>
 
-                <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", marginBottom: 4 }}>Role</label>
-                    <select name="roleName" value={form.roleName} onChange={onChange} style={{ width: "100%", padding: 8 }}>
-                        <option value="DRIVER">DRIVER</option>
-                        <option value="MANAGER">MANAGER</option>
+                <label>
+                    {t("users.form.role")}{" "}
+                    <select name="roleName" value={form.roleName} onChange={onChange}>
+                        <option value="DRIVER">{t("roles.DRIVER")}</option>
+                        <option value="MANAGER">{t("roles.MANAGER")}</option>
                     </select>
-                    {errors.roleName && <div style={{ color: "crimson" }}>{errors.roleName}</div>}
-                </div>
+                </label>
 
                 {form.roleName === "DRIVER" && (
-                    <div style={{ marginBottom: 12 }}>
-                        <label style={{ display: "block", marginBottom: 4 }}>
-                            Driver (optional link)
-                        </label>
-                        <select name="driver" value={form.driver} onChange={onChange} style={{ width: "100%", padding: 8 }}>
-                            <option value="">-- none --</option>
+                    <label>
+                        {t("users.form.driver")}{" "}
+                        <select name="driver" value={form.driver} onChange={onChange}>
+                            <option value="">{t("users.form.driver.none")}</option>
                             {drivers.map((d) => (
                                 <option key={d.id} value={d.id}>
-                                    {d.name} (#{d.id}) - {d.teamName}
+                                    {d.name} (#{d.id})
                                 </option>
                             ))}
                         </select>
-                        {errors.driver && <div style={{ color: "crimson" }}>{errors.driver}</div>}
-                    </div>
+                    </label>
                 )}
 
                 <div style={{ display: "flex", gap: 8 }}>
-                    <button type="submit" disabled={!canSubmit} style={{ padding: "8px 12px" }}>
-                        {submitting ? "Saving..." : "Save"}
+                    <button type="submit" disabled={saving}>
+                        {saving ? t("common.saving") : t("common.save")}
                     </button>
-                    <button type="button" onClick={() => navigate("/admin/users")} style={{ padding: "8px 12px" }}>
-                        Cancel
+                    <button type="button" onClick={() => navigate("/admin/users")}>
+                        {t("common.cancel")}
                     </button>
                 </div>
             </form>

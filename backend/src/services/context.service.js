@@ -1,17 +1,18 @@
-import { db, sql } from "../db.js";
+import { db } from "../db.js";
 
 export async function getUserContext(userId) {
     const pool = await db();
-    const result = await pool.request()
-        .input("userId", sql.Int, userId)
-        .query(`
-      SELECT u.id, u.preferredLanguage, u.driver AS driverId, r.name AS roleName
-      FROM [User] u
-      JOIN [Role] r ON r.id = u.[role]
-      WHERE u.id = @userId
-    `);
 
-    const row = result.recordset[0];
+    const [rows] = await pool.query(
+        `SELECT u.id, u.preferredLanguage, u.driver AS driverId, r.name AS roleName
+     FROM users u
+     JOIN role r ON r.id = u.role
+     WHERE u.id = ?
+     LIMIT 1`,
+        [userId]
+    );
+
+    const row = rows[0];
     if (!row) {
         const err = new Error("User not found");
         err.status = 401;
@@ -20,10 +21,14 @@ export async function getUserContext(userId) {
 
     let managerTeamId = null;
     if (row.roleName === "MANAGER") {
-        const t = await pool.request()
-            .input("userId", sql.Int, userId)
-            .query(`SELECT TOP 1 id FROM Team WHERE manager = @userId`);
-        managerTeamId = t.recordset[0]?.id ?? null;
+        const [tRows] = await pool.query(
+            `SELECT id
+       FROM team
+       WHERE manager = ?
+       LIMIT 1`,
+            [userId]
+        );
+        managerTeamId = tRows[0]?.id ?? null;
     }
 
     return {
@@ -31,6 +36,6 @@ export async function getUserContext(userId) {
         roleName: row.roleName,
         preferredLanguage: row.preferredLanguage,
         driverId: row.driverId,
-        managerTeamId
+        managerTeamId,
     };
 }

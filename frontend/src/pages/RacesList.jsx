@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { http } from "../api/http";
-import { Link, useLocation } from "react-router-dom";
 import Pagination from "../components/Pagination";
 import { useAuth } from "../auth/AuthContext";
 import { useTranslation } from "react-i18next";
@@ -8,45 +8,37 @@ import { useTranslation } from "react-i18next";
 export default function RacesList() {
     const { t } = useTranslation();
     const { role } = useAuth();
-    const location = useLocation();
+    const isAdmin = role === "ADMIN";
 
     const [data, setData] = useState({ items: [], page: 1, pageSize: 10, total: 0 });
 
     const load = async (page) => {
-        const r = await http.get("/races", { params: { page, pageSize: data.pageSize } });
-        setData(r.data);
-    };
-
-    const onDelete = async (id) => {
-        const ok = window.confirm(`Na pewno usunąć wyścig #${id}?`);
-        if (!ok) return;
-
-        try {
-            await http.delete(`/races/${id}`);
-            await load(data.page); // odśwież bieżącą stronę
-        } catch (err) {
-            const msg =
-                err?.response?.data?.message ||
-                "Nie udało się usunąć wyścigu (może ma enrollmenty).";
-            alert(msg);
-        }
+        const res = await http.get("/races", { params: { page, pageSize: data.pageSize } });
+        setData(res.data);
     };
 
     useEffect(() => {
         load(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    useEffect(() => {
-        load(data.page || 1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [location.key]);
+    const onDelete = async (id) => {
+        if (!window.confirm(t("races.delete.confirm", { id }))) return;
+
+        try {
+            await http.delete(`/races/${id}`);
+            load(data.page);
+        } catch (err) {
+            alert(err?.response?.data?.message || t("races.delete.failed"));
+        }
+    };
 
     return (
         <div>
+            <div className="hero" style={{ backgroundImage: "url(/images/races.jpg)" }} />
+
             <h2>{t("nav.races")}</h2>
 
-            {role === "ADMIN" && (
+            {isAdmin && (
                 <div style={{ marginBottom: 10 }}>
                     <Link to="/races/new">{t("common.create")}</Link>
                 </div>
@@ -55,12 +47,12 @@ export default function RacesList() {
             <table border="1" cellPadding="6">
                 <thead>
                 <tr>
-                    <th>id</th>
-                    <th>name</th>
-                    <th>startDate</th>
-                    <th>status</th>
-                    <th></th>
-                    {role === "ADMIN" && <th></th>}
+                    <th>{t("common.id")}</th>
+                    <th>{t("races.fields.name")}</th>
+                    <th>{t("races.fields.startDate")}</th>
+                    <th>{t("races.fields.status")}</th>
+                    <th>{t("common.details")}</th>
+                    {isAdmin && <th>{t("common.actions")}</th>}
                 </tr>
                 </thead>
 
@@ -71,12 +63,14 @@ export default function RacesList() {
                         <td>{r.name}</td>
                         <td>{String(r.startDate).slice(0, 10)}</td>
                         <td>{r.status}</td>
+
                         <td>
                             <Link to={`/races/${r.id}`}>{t("common.details")}</Link>
                         </td>
 
-                        {role === "ADMIN" && (
+                        {isAdmin && (
                             <td>
+                                <Link to={`/races/${r.id}/edit`}>{t("common.edit")}</Link>{" "}
                                 <button type="button" onClick={() => onDelete(r.id)}>
                                     {t("common.delete")}
                                 </button>
@@ -87,12 +81,7 @@ export default function RacesList() {
                 </tbody>
             </table>
 
-            <Pagination
-                page={data.page}
-                pageSize={data.pageSize}
-                total={data.total}
-                onPage={(p) => load(p)}
-            />
+            <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPage={load} />
         </div>
     );
 }

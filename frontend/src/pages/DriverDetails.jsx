@@ -11,36 +11,63 @@ export default function DriverDetails() {
     const [data, setData] = useState(null);
 
     useEffect(() => {
-        http.get(`/drivers/${id}`).then(r => setData(r.data));
+        http.get(`/drivers/${id}`).then((r) => setData(r.data));
     }, [id]);
 
-    if (!data) return <div>Loading...</div>;
+    if (!data) return <div>{t("common.loading")}</div>;
 
     return (
         <div>
-            <h2>Driver #{data.driver.id}: {data.driver.name}</h2>
-            <div>dateOfBirth: {String(data.driver.dateOfBirth).slice(0,10)}</div>
-            <div>team: {data.driver.teamName} (#{data.driver.team})</div>
+            <div
+                className="hero"
+                style={{
+                    backgroundImage: "url(/images/drivers.jpg)",
+                }}
+            />
 
-            {role === "ADMIN" && (
+            <h2>
+                {t("drivers.details.title", { id: data.driver.id })}: {data.driver.name}
+            </h2>
+
+            <div>
+                {t("drivers.fields.dateOfBirth")}: {String(data.driver.dateOfBirth).slice(0, 10)}
+            </div>
+
+            <div>
+                {t("drivers.fields.team")}: {data.driver.teamName} (#{data.driver.team})
+            </div>
+
+            {role === "MANAGER" && (
                 <div style={{ marginTop: 10 }}>
                     <Link to={`/drivers/${data.driver.id}/edit`}>{t("common.edit")}</Link>
                 </div>
             )}
 
-            <h3 style={{ marginTop: 16 }}>Enrollments</h3>
+            <h3 style={{ marginTop: 16 }}>{t("drivers.enrollments.title")}</h3>
+
             <table border="1" cellPadding="6">
                 <thead>
-                <tr><th>id</th><th>race</th><th>startDate</th><th>finishPosition</th><th></th></tr>
+                <tr>
+                    <th>{t("common.id")}</th>
+                    <th>{t("enrollments.fields.race")}</th>
+                    <th>{t("races.fields.startDate")}</th>
+                    <th>{t("enrollments.fields.finishPosition")}</th>
+                    <th></th>
+                </tr>
                 </thead>
+
                 <tbody>
-                {data.enrollments.map(e => (
+                {data.enrollments.map((e) => (
                     <tr key={e.id}>
                         <td>{e.id}</td>
-                        <td>{e.raceName} (#{e.raceId})</td>
-                        <td>{String(e.startDate).slice(0,10)}</td>
+                        <td>
+                            {e.raceName} (#{e.raceId})
+                        </td>
+                        <td>{String(e.startDate).slice(0, 10)}</td>
                         <td>{e.finishPosition ?? "-"}</td>
-                        <td><Link to={`/enrollments/${e.id}`}>{t("common.details")}</Link></td>
+                        <td>
+                            <Link to={`/enrollments/${e.id}`}>{t("common.details")}</Link>
+                        </td>
                     </tr>
                 ))}
                 </tbody>

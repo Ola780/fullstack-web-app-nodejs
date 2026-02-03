@@ -1,32 +1,24 @@
-import sql from "mssql";
-import { config } from "./config.js";
-import dotenv from "dotenv";
-dotenv.config();
-console.log("DB CFG =", {
-    server: config.db.server,
-    port: config.db.port,
-    database: config.db.database,
-    user: config.db.user,
-    passwordLength: (config.db.password || "").length,
-    encrypt: config.db.encrypt,
-});
+import mysql from "mysql2/promise";
 
-
-const poolPromise = new sql.ConnectionPool({
-    server: config.db.server,
-    port: config.db.port,
-    database: config.db.database,
-    user: config.db.user,
-    password: config.db.password,
-    options: {
-        encrypt: false,
-        trustServerCertificate: true
-    }
-}).connect();
+let pool;
 
 export async function db() {
-    return poolPromise;
+    if (pool) return pool;
+
+    pool = mysql.createPool({
+        host: process.env.DB_HOST,
+        port: Number(process.env.DB_PORT),
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        namedPlaceholders: false,
+    });
+
+    await pool.query("SELECT 1");
+
+    return pool;
 }
-
-export { sql };
-
